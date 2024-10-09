@@ -3,8 +3,10 @@
 echo " Saisir une adresse ip :"
 read ip
 
-if [ "$1"="Complet" ];then
-    echo "Lancement du scan complet : $ip" 
+if [ $a -eq 1 ];then
+    echo "Saisie un ip pour un scan rapide:"
+    read ip
+    echo "Lancement d'un scan rapide sur les hôtes :$ip"
     nmap -F $ip
 fi
 
