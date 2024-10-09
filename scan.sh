@@ -1,6 +1,18 @@
 #!/bin/bash
 
-if [ "$1"="personalise" ];then
+echo "Quel est l'operation que vous voulez realiser ?
+- 1 : rapide
+- 2 : complet
+- 3 : personalise"
+read a;
+
+if [ $a -eq 1 ];then
+    echo "Saisie un ip pour un scan rapide:"
+    read ip
+    echo "Lancement d'un scan rapide sur les hôtes :$ip"
+    nmap -F $ip
+
+elif [ $a -eq 3 ];then
     echo "quel l'ip de/s hote a analyser ?";
     read idHote;
 
