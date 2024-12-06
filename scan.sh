@@ -6,6 +6,9 @@ echo "Quel est l'operation que vous voulez realiser ?
 - 3 : personalise"
 read a;
 
+echo "le format des ips est classic pour un ip, ip-n° pour une range 
+d'ips et ip1 ip2 ... ipN pour des ips specifiques"
+
 if [ $a -eq 1 ];then
     echo "Saisie un ip pour un scan rapide:"
     read ip
