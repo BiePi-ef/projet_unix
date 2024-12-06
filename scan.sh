@@ -12,6 +12,13 @@ if [ $a -eq 1 ];then
     echo "Lancement d'un scan rapide sur les hôtes :$ip"
     nmap -F $ip
 
+elif [ "$a" -eq 2 ]; then
+    echo "Saisissez une IP pour un scan complet :"
+    read ip
+    echo "Lancement d'un scan complet (TCP et UDP) sur l'hôte : $ip"
+    echo "Ce scan peut prendre du temps..."
+    nmap -p- -sU -sT "$ip"
+
 elif [ $a -eq 3 ];then
     echo "quel l'ip de/s hote a analyser ?";
     read idHote;
