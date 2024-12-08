@@ -23,38 +23,36 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Fonction pour demander les informations en mode interactif
-function interactif() {
-    echo "Quel type de scan souhaitez-vous effectuer ?
-1 : Scan rapide
-2 : Scan complet
-3 : Scan personnalisé"
-    read scanType
+# Fonction pour demander les informations manquantes
+function demander_si_manquant() {
+    local varName="$1"  # Nom de la variable à vérifier
+    local question="$2" # Question à poser si la variable est vide
+    local isOptional="$3" # "y" si la variable est facultative
 
-    echo "Entrez l'adresse IP cible :"
-    read ip
+    # Si la variable est vide, poser la question
+    if [ -z "${!varName}" ]; then
+        echo "$question"
+        read userInput
 
-    if [ "$scanType" -eq 3 ]; then
-        echo "Entrez le(s) port(s) à scanner (ex : 80,443 ou 1-1000) :"
-        read ports
-    fi
+        # Vérification pour les variables obligatoires
+        if [ -z "$userInput" ] && [ "$isOptional" != "y" ]; then
+            echo "Erreur : Ce champ est obligatoire."
+            exit 1
+        fi
 
-    echo "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)"
-    read osScan
-
-    echo "Voulez-vous sauvegarder le rapport dans un fichier ? (y/n)"
-    read saveReport
-    if [ "$saveReport" = "y" ]; then
-        echo "Entrez le chemin du fichier de rapport :"
-        read outputFile
+        # Affecter la valeur entrée par l'utilisateur
+        eval "$varName='$userInput'"
     fi
 }
 
-# Basculer en mode interactif si aucun argument n'est fourni
-if [[ -z "$scanType" || -z "$ip" ]]; then
-    echo "Aucun argument détecté. Passage en mode interactif."
-    interactif
+# Demander les informations manquantes
+demander_si_manquant "scanType" "Quel type de scan souhaitez-vous effectuer ? (1 = rapide, 2 = complet, 3 = personnalisé)" "n"
+demander_si_manquant "ip" "Entrez l'adresse IP cible :" "n"
+if [ "$scanType" -eq 3 ]; then
+    demander_si_manquant "ports" "Entrez le(s) port(s) à scanner (ex : 80,443 ou 1-1000) :" "n"
 fi
+demander_si_manquant "osScan" "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)" "y"
+demander_si_manquant "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le chemin (ou appuyez sur Entrée pour ignorer) :" "y"
 
 # Préparer les options pour Nmap
 options=""
@@ -71,10 +69,6 @@ case $scanType in
         echo "Lancement d'un scan complet sur $ip..."
         nmap -p- -sT -sU $options "$ip" ;;
     3)
-        if [ -z "$ports" ]; then
-            echo "Erreur : Vous devez spécifier les ports pour un scan personnalisé (--ports)."
-            exit 1
-        fi
         echo "Lancement d'un scan personnalisé sur $ip pour les ports $ports..."
         nmap -p "$ports" $options "$ip" ;;
     *)
