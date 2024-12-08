@@ -6,7 +6,7 @@
 scanType=""
 ip=""
 ports=""
-osScan="n"
+osScan=""
 cronMode="n"
 outputFile=""
 
@@ -48,13 +48,12 @@ function demander_si_manquant() {
 # Validation et formatage des adresses IP saisies
 function valider_ip() {
     local ip_input="$1"
-    # Vérifie si c'est une seule IP, une plage ou une liste séparée par des virgules
     if [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || \
        [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}-([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || \
        [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(,([0-9]{1,3}\.){3}[0-9]{1,3})+$ ]]; then
         echo "$ip_input"
     else
-        echo "Erreur : Format d'adresse IP invalide. Veuillez saisir une seule IP, une plage (ex. : 192.168.1.1-192.168.1.10) ou plusieurs adresses séparées par des virgules." >&2
+        echo "Erreur : Format d'adresse IP invalide. Veuillez saisir une seule IP, une plage ou plusieurs adresses séparées par des virgules." >&2
         exit 1
     fi
 }
@@ -62,13 +61,12 @@ function valider_ip() {
 # Validation des ports ou plages de ports saisies
 function valider_ports() {
     local ports_input="$1"
-    # Vérifie si c'est un seul port, une plage ou une liste de ports
     if [[ "$ports_input" =~ ^[0-9]{1,5}$ ]] || \
        [[ "$ports_input" =~ ^[0-9]{1,5}-[0-9]{1,5}$ ]] || \
        [[ "$ports_input" =~ ^[0-9]{1,5}(,[0-9]{1,5})+$ ]]; then
         echo "$ports_input"
     else
-        echo "Erreur : Format de ports invalide. Veuillez saisir un seul port (ex. : 80), une plage (ex. : 20-80), ou plusieurs ports séparés par des virgules (ex. : 80,443,8080)." >&2
+        echo "Erreur : Format de ports invalide. Veuillez saisir un seul port, une plage ou plusieurs ports séparés par des virgules." >&2
         exit 1
     fi
 }
@@ -81,7 +79,7 @@ if [ "$scanType" -eq 3 ]; then
     demander_si_manquant "ports" "Entrez le(s) port(s) à scanner (ex : 80,443 ou 1-1000) :" "n"
     ports=$(valider_ports "$ports")  # Valider l'entrée des ports
 fi
-demander_si_manquant "osScan" "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)" "y"
+demander_si_manquant "osScan" "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)" "n"
 demander_si_manquant "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le chemin (ou appuyez sur Entrée pour ignorer) :" "y"
 
 # Préparer les options pour Nmap
