@@ -187,7 +187,7 @@ if [ "$cronMode" != "y" ]; then
         fi
     done
 else
-    cronChoice=2  # Si en mode cron, on planifie automatiquement
+    cronChoice=1  # Si en mode cron, on lance immediatement le script
 fi
 
 # Si l'utilisateur a choisi de planifier via cron, demander l'heure et la fréquence
@@ -215,7 +215,7 @@ if [ "$cronChoice" -eq 2 ]; then
 
     if [ "$cronFrequency" -eq 1 ]; then
         # Planification quotidienne
-        cronJob="$cronMinute $cronHour * * * $SCRIPTPATH/$SCRIPTNAME --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
+        cronJob="$cronMinute $cronHour * * * $SCRIPTPATH/$SCRIPTNAME --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo --cron"
     elif [ "$cronFrequency" -eq 2 ]; then
         # Planification hebdomadaire
         while true; do
@@ -228,7 +228,7 @@ if [ "$cronChoice" -eq 2 ]; then
                 echo "Jour invalide, veuillez entrer un jour valide (Lundi, Mardi, etc.)."
             fi
         done
-        cronJob="$cronMinute $cronHour * * $cronDayNumber $SCRIPTPATH/$SCRIPTNAME --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
+        cronJob="$cronMinute $cronHour * * $cronDayNumber $SCRIPTPATH/$SCRIPTNAME --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo --cron"
     else
         echo "Option de fréquence invalide."
         exit 1
