@@ -17,14 +17,18 @@ Procedure à suivre :
 
 Exemples d'exécution
 Mode manuel avec affichage de la sortie :
+
 ```./nmap_scanner.sh```
 
 Mode non interactif avec rapport uniquement :
+
 ```./nmap_scanner.sh --type 1 --ip 192.168.1.1 --cron --output scan_rapport.txt```
 
 Scan complet avec détection avancée et rapport enregistré :
+
 ```./nmap_scanner.sh --type 2 --ip 192.168.1.1 --osScan y --output scan_complet.txt```
 
 Scan personnalisé sur des ports spécifiques avec rapport :
+
 ```./nmap_scanner.sh --type 3 --ip 192.168.1.1 --ports 80,443 --output scan_perso.txt```
 
