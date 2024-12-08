@@ -13,6 +13,10 @@ emailFrom=""
 emailTo=""
 cronJob=""
 
+# Définition des variables globales SCRIPTPATH et SCRIPTNAME
+SCRIPTPATH=$(dirname "$(realpath "$0")")
+SCRIPTNAME=$(basename "$0")
+
 # Parse des arguments passés en ligne de commande
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -27,6 +31,25 @@ while [[ $# -gt 0 ]]; do
         *) echo "Option inconnue : $1"; exit 1 ;;
     esac
 done
+
+# Fonction pour valider l'heure au format HH:MM
+function valider_heure() {
+    local heure="$1"
+    if [[ "$heure" =~ ^([0-1][0-9]|2[0-3]):([0-5][0-9])$ ]]; then
+        return 0  # Heure valide
+    else
+        return 1  # Heure invalide
+    fi
+}
+
+# Fonction pour valider le jour de la semaine
+function valider_jour_semaine() {
+    local jour="$1"
+    case "$jour" in
+        Lundi|Mardi|Mercredi|Jeudi|Vendredi|Samedi|Dimanche) return 0 ;;  # Jour valide
+        *) return 1 ;;  # Jour invalide
+    esac
+}
 
 # Fonction interactive pour demander une réponse valide
 function demander_et_valider() {
@@ -90,15 +113,15 @@ function valider_oui_non() {
     [[ "$input" =~ ^[yYnN]$ ]]  # Accepte uniquement "y", "n", "Y", "N"
 }
 
-# Validation du chemin du fichier (outputFile)
-function valider_chemin_fichier() {
-    local chemin_fichier="$1"
+# Validation du nom du fichier (outputFile)
+function valider_nom_fichier() {
+    local nom_fichier="$1"
     # Si l'utilisateur n'a rien entré (appuyé sur Entrée), c'est valide
-    if [ -z "$chemin_fichier" ]; then
+    if [ -z "$nom_fichier" ]; then
         return 0
     fi
-    # Vérifie que c'est un chemin valide pour un fichier
-    if [[ "$chemin_fichier" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+    # Vérifie que c'est un nom valide pour un fichier
+    if [[ "$nom_fichier" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
         return 0
     else
         return 1
@@ -140,7 +163,7 @@ if [ "$scanType" -eq 3 ]; then
     demander_et_valider "ports" "Entrez le(s) port(s) à scanner (ex : 80,443 ou 1-1000) :" valider_ports "n"
 fi
 demander_et_valider "osScan" "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)" valider_oui_non "n"
-demander_et_valider "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le chemin (ou appuyez sur Entrée pour ignorer) :" valider_chemin_fichier "y"
+demander_et_valider "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le nom (ou appuyez sur Entrée pour ignorer) :" valider_nom_fichier "y"
 
 # Demander si l'utilisateur veut envoyer le rapport par email
 demander_et_valider "emailTo" "Voulez-vous envoyer le rapport par email ? Si oui, entrez l'adresse email de destination (To) :" valider_email "y"
@@ -167,10 +190,18 @@ else
     cronChoice=2  # Si en mode cron, on planifie automatiquement
 fi
 
+# Si l'utilisateur a choisi de planifier via cron, demander l'heure et la fréquence
 if [ "$cronChoice" -eq 2 ]; then
     # Demander l'heure et la fréquence
-    echo "À quelle heure voulez-vous exécuter la commande ? (Format : HH:MM)"
-    read cronTime
+    while true; do
+        echo "À quelle heure voulez-vous exécuter la commande ? (Format : HH:MM)"
+        read cronTime
+        if valider_heure "$cronTime"; then
+            break
+        else
+            echo "L'heure entrée est invalide. Veuillez entrer une heure valide au format HH:MM (00:00 à 23:59)."
+        fi
+    done
 
     # Parser l'heure et la minute
     cronTimeParsed=$(parse_cron_time "$cronTime")
@@ -184,17 +215,20 @@ if [ "$cronChoice" -eq 2 ]; then
 
     if [ "$cronFrequency" -eq 1 ]; then
         # Planification quotidienne
-        cronJob="0 $cronMinute $cronHour * * * /path/to/your/script.sh --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
+        cronJob="$cronMinute $cronHour * * * $SCRIPTPATH/$SCRIPTNAME --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
     elif [ "$cronFrequency" -eq 2 ]; then
         # Planification hebdomadaire
-        echo "Quel jour de la semaine voulez-vous pour la planification ? (Lundi, Mardi, etc.)"
-        read cronDay
-        cronDayNumber=$(obtenir_jour_semaine "$cronDay")
-        if [ "$cronDayNumber" == "Jour invalide" ]; then
-            echo "Jour invalide, annulation de la planification."
-            exit 1
-        fi
-        cronJob="0 $cronMinute $cronHour * * $cronDayNumber /path/to/your/script.sh --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
+        while true; do
+            echo "Quel jour de la semaine voulez-vous pour la planification ? (Lundi, Mardi, etc.)"
+            read cronDay
+            if valider_jour_semaine "$cronDay"; then
+                cronDayNumber=$(obtenir_jour_semaine "$cronDay")
+                break
+            else
+                echo "Jour invalide, veuillez entrer un jour valide (Lundi, Mardi, etc.)."
+            fi
+        done
+        cronJob="$cronMinute $cronHour * * $cronDayNumber $SCRIPTPATH/$SCRIPTNAME --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
     else
         echo "Option de fréquence invalide."
         exit 1
@@ -206,6 +240,12 @@ if [ "$cronChoice" -eq 2 ]; then
 else
     # Lancer immédiatement
     echo "Lancement du scan immédiatement..."
+    # Préparer les options Nmap (ajout de l'option -A pour la détection avancée)
+    options=""
+    if [[ "$osScan" =~ ^[yY]$ ]]; then
+        options="-A"
+    fi
+
     # Construct the Nmap command and execute it
     nmapCommand="nmap $options"
     case $scanType in
@@ -223,16 +263,16 @@ else
     # Exécuter la commande Nmap
     scanOutput=$(eval "$nmapCommand")
 
-    # Sauvegarder le rapport si demandé
+    # Si l'utilisateur a demandé de sauvegarder le rapport, le fichier sera créé dans le même répertoire que le script
     if [ -n "$outputFile" ]; then
-        echo "$scanOutput" > "$outputFile"
+        echo "$scanOutput" > "$SCRIPTPATH/$outputFile"
         echo "Rapport généré avec succès : $outputFile"
     fi
 
     # Envoyer le rapport par email
     if [ -n "$emailTo" ]; then
         if [ -n "$outputFile" ]; then
-            echo "Veuillez trouver ci-joint le rapport de scan Nmap." | mail -s "Rapport de scan Nmap" -r "$emailFrom" -A "$outputFile" "$emailTo"
+            echo "Veuillez trouver ci-joint le rapport de scan Nmap." | mail -s "Rapport de scan Nmap" -r "$emailFrom" -A "$SCRIPTPATH/$outputFile" "$emailTo"
             echo "Rapport envoyé avec succès de $emailFrom à $emailTo"
         else
             echo "Erreur : Aucune pièce jointe à envoyer. Veuillez spécifier un fichier de rapport avec --output."
