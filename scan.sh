@@ -3,7 +3,8 @@
 echo "Quel est l'operation que vous voulez realiser ?
 - 1 : rapide
 - 2 : complet
-- 3 : personalise"
+- 3 : personalise
+- 4 : Automatisation des scans"
 read a;
 
 echo "le format des ips est classic pour un ip, ip-n° pour une range 
@@ -33,4 +34,10 @@ elif [ $a -eq 3 ];then
     read ports
 
     nmap $idHote -p $ports
+    
+elif [ "$a" -eq 4 ]; then
+    echo "Exécution du script d'automatisation des scans..."
+    ./cron.sh
+else
+    echo "Option invalide. Veuillez choisir une option entre 1 et 4."
 fi
