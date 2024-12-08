@@ -9,6 +9,7 @@ ports=""
 osScan=""
 cronMode="n"
 outputFile=""
+email=""
 
 # Parse des arguments passés en ligne de commande
 while [[ $# -gt 0 ]]; do
@@ -18,6 +19,7 @@ while [[ $# -gt 0 ]]; do
         --ports) ports="$2"; shift 2 ;;        # Ports à scanner (pour le type 3 uniquement)
         --osScan) osScan="$2"; shift 2 ;;      # Détection avancée : y ou n
         --output) outputFile="$2"; shift 2 ;;  # Fichier pour sauvegarder le rapport
+        --email) email="$2"; shift 2 ;;        # Adresse email pour envoyer le rapport
         --cron) cronMode="y"; shift ;;         # Activer le mode cron
         *) echo "Option inconnue : $1"; exit 1 ;;
     esac
@@ -71,6 +73,17 @@ function valider_ports() {
     fi
 }
 
+# Validation d'une adresse email
+function valider_email() {
+    local email_input="$1"
+    if [[ "$email_input" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        echo "$email_input"
+    else
+        echo "Erreur : Adresse email invalide. Veuillez entrer une adresse email valide." >&2
+        exit 1
+    fi
+}
+
 # Demander les informations manquantes
 demander_si_manquant "scanType" "Quel type de scan souhaitez-vous effectuer ? (1 = rapide, 2 = complet, 3 = personnalisé)" "n"
 demander_si_manquant "ip" "Entrez l'adresse IP (ex. : 192.168.1.1, 192.168.1.1-192.168.1.10 ou plusieurs IP séparées par des virgules) :" "n"
@@ -81,6 +94,12 @@ if [ "$scanType" -eq 3 ]; then
 fi
 demander_si_manquant "osScan" "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)" "n"
 demander_si_manquant "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le chemin (ou appuyez sur Entrée pour ignorer) :" "y"
+demander_si_manquant "email" "Voulez-vous envoyer le rapport par email ? Si oui, entrez une adresse email (ou appuyez sur Entrée pour ignorer) :" "y"
+
+# Si une adresse email est fournie, la valider
+if [ -n "$email" ]; then
+    email=$(valider_email "$email")
+fi
 
 # Préparer les options pour Nmap
 options=""
@@ -119,5 +138,15 @@ else
         echo "$scanOutput" > "$outputFile"
         echo "Rapport généré avec succès : $outputFile"
     fi
+fi
+
+# Envoyer le rapport par email si demandé
+if [ -n "$email" ]; then
+    if [ -n "$outputFile" ]; then
+        mail -s "Rapport de scan Nmap" "$email" < "$outputFile"
+    else
+        echo "$scanOutput" | mail -s "Rapport de scan Nmap" "$email"
+    fi
+    echo "Rapport envoyé avec succès à : $email"
 fi
 
