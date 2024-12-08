@@ -9,7 +9,9 @@ ports=""
 osScan=""
 cronMode="n"
 outputFile=""
-email=""
+emailFrom=""
+emailTo=""
+cronJob=""
 
 # Parse des arguments passés en ligne de commande
 while [[ $# -gt 0 ]]; do
@@ -19,134 +21,223 @@ while [[ $# -gt 0 ]]; do
         --ports) ports="$2"; shift 2 ;;        # Ports à scanner (pour le type 3 uniquement)
         --osScan) osScan="$2"; shift 2 ;;      # Détection avancée : y ou n
         --output) outputFile="$2"; shift 2 ;;  # Fichier pour sauvegarder le rapport
-        --email) email="$2"; shift 2 ;;        # Adresse email pour envoyer le rapport
+        --emailFrom) emailFrom="$2"; shift 2 ;; # Adresse email d'expéditeur
+        --emailTo) emailTo="$2"; shift 2 ;;    # Adresse email de destination
         --cron) cronMode="y"; shift ;;         # Activer le mode cron
         *) echo "Option inconnue : $1"; exit 1 ;;
     esac
 done
 
-# Fonction pour demander les informations manquantes
-function demander_si_manquant() {
-    local varName="$1"  # Nom de la variable à vérifier
-    local question="$2" # Question à poser si la variable est vide
-    local isOptional="$3" # "y" si la variable est facultative
+# Fonction interactive pour demander une réponse valide
+function demander_et_valider() {
+    local varName="$1"
+    local question="$2"
+    local validationFunction="$3"  # Nom de la fonction de validation
+    local isOptional="$4"          # "y" si la variable est facultative
 
-    # Si la variable est vide, poser la question
-    if [ -z "${!varName}" ]; then
-        echo "$question"
-        read userInput
-
-        # Vérification pour les variables obligatoires
-        if [ -z "$userInput" ] && [ "$isOptional" != "y" ]; then
-            echo "Erreur : Ce champ est obligatoire."
-            exit 1
+    while true; do
+        if [ -z "${!varName}" ]; then
+            echo "$question"
+            read userInput
+        else
+            userInput="${!varName}"
         fi
 
-        # Affecter la valeur entrée par l'utilisateur
-        eval "$varName='$userInput'"
-    fi
+        if [ -z "$userInput" ] && [ "$isOptional" = "y" ]; then
+            eval "$varName=''"
+            break
+        elif $validationFunction "$userInput"; then
+            eval "$varName='$userInput'"
+            break
+        else
+            echo "Entrée invalide. Veuillez réessayer."
+        fi
+    done
 }
 
-# Validation et formatage des adresses IP saisies
+# Validation du type de scan
+function valider_scanType() {
+    local scanType_input="$1"
+    [[ "$scanType_input" =~ ^[1-3]$ ]]  # Accepte uniquement 1, 2 ou 3
+}
+
+# Validation des adresses IP
 function valider_ip() {
     local ip_input="$1"
-    if [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || \
-       [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}-([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || \
-       [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(,([0-9]{1,3}\.){3}[0-9]{1,3})+$ ]]; then
-        echo "$ip_input"
-    else
-        echo "Erreur : Format d'adresse IP invalide. Veuillez saisir une seule IP, une plage ou plusieurs adresses séparées par des virgules." >&2
-        exit 1
-    fi
+    [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || \
+    [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}-([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || \
+    [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}-[0-9]{1,3}$ ]] || \
+    [[ "$ip_input" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(,([0-9]{1,3}\.){3}[0-9]{1,3})+$ ]]
 }
 
-# Validation des ports ou plages de ports saisies
+# Validation des ports
 function valider_ports() {
     local ports_input="$1"
-    if [[ "$ports_input" =~ ^[0-9]{1,5}$ ]] || \
-       [[ "$ports_input" =~ ^[0-9]{1,5}-[0-9]{1,5}$ ]] || \
-       [[ "$ports_input" =~ ^[0-9]{1,5}(,[0-9]{1,5})+$ ]]; then
-        echo "$ports_input"
-    else
-        echo "Erreur : Format de ports invalide. Veuillez saisir un seul port, une plage ou plusieurs ports séparés par des virgules." >&2
-        exit 1
-    fi
+    [[ "$ports_input" =~ ^[0-9]{1,5}$ ]] || \
+    [[ "$ports_input" =~ ^[0-9]{1,5}-[0-9]{1,5}$ ]] || \
+    [[ "$ports_input" =~ ^[0-9]{1,5}(,[0-9]{1,5})+$ ]]
 }
 
-# Validation d'une adresse email
+# Validation des emails
 function valider_email() {
     local email_input="$1"
-    if [[ "$email_input" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        echo "$email_input"
+    [[ "$email_input" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
+}
+
+# Validation pour `y` ou `n`
+function valider_oui_non() {
+    local input="$1"
+    [[ "$input" =~ ^[yYnN]$ ]]  # Accepte uniquement "y", "n", "Y", "N"
+}
+
+# Validation du chemin du fichier (outputFile)
+function valider_chemin_fichier() {
+    local chemin_fichier="$1"
+    # Si l'utilisateur n'a rien entré (appuyé sur Entrée), c'est valide
+    if [ -z "$chemin_fichier" ]; then
+        return 0
+    fi
+    # Vérifie que c'est un chemin valide pour un fichier
+    if [[ "$chemin_fichier" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+        return 0
     else
-        echo "Erreur : Adresse email invalide. Veuillez entrer une adresse email valide." >&2
-        exit 1
+        return 1
     fi
 }
 
-# Demander les informations manquantes
-demander_si_manquant "scanType" "Quel type de scan souhaitez-vous effectuer ? (1 = rapide, 2 = complet, 3 = personnalisé)" "n"
-demander_si_manquant "ip" "Entrez l'adresse IP (ex. : 192.168.1.1, 192.168.1.1-192.168.1.10 ou plusieurs IP séparées par des virgules) :" "n"
-ip=$(valider_ip "$ip")  # Valider l'entrée IP
+# Fonction pour valider la réponse à la question "Lancer immédiatement ou planifier une tâche cron"
+function valider_cron_choice() {
+    local choice="$1"
+    [[ "$choice" =~ ^[1-2]$ ]]  # Accepte uniquement 1 ou 2
+}
+
+# Fonction pour obtenir le jour de la semaine au format cron
+function obtenir_jour_semaine() {
+    local jour="$1"
+    case "$jour" in
+        Lundi) echo 1 ;;
+        Mardi) echo 2 ;;
+        Mercredi) echo 3 ;;
+        Jeudi) echo 4 ;;
+        Vendredi) echo 5 ;;
+        Samedi) echo 6 ;;
+        Dimanche) echo 0 ;;
+        *) echo "Jour invalide" ;;
+    esac
+}
+
+# Fonction pour parser l'heure et la minute
+function parse_cron_time() {
+    local cronTime="$1"
+    IFS=":" read -r cronHour cronMinute <<< "$cronTime"
+    echo "$cronMinute $cronHour"
+}
+
+# Demander et valider les informations
+demander_et_valider "scanType" "Quel type de scan souhaitez-vous effectuer ? (1 = rapide, 2 = complet, 3 = personnalisé)" valider_scanType "n"
+demander_et_valider "ip" "Entrez l'adresse IP (ex. : 192.168.1.1, 192.168.1.1-192.168.1.10, 192.168.1.1-100 ou plusieurs IP distinctes séparées par des virgules) :" valider_ip "n"
 if [ "$scanType" -eq 3 ]; then
-    demander_si_manquant "ports" "Entrez le(s) port(s) à scanner (ex : 80,443 ou 1-1000) :" "n"
-    ports=$(valider_ports "$ports")  # Valider l'entrée des ports
+    demander_et_valider "ports" "Entrez le(s) port(s) à scanner (ex : 80,443 ou 1-1000) :" valider_ports "n"
 fi
-demander_si_manquant "osScan" "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)" "n"
-demander_si_manquant "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le chemin (ou appuyez sur Entrée pour ignorer) :" "y"
-demander_si_manquant "email" "Voulez-vous envoyer le rapport par email ? Si oui, entrez une adresse email (ou appuyez sur Entrée pour ignorer) :" "y"
+demander_et_valider "osScan" "Voulez-vous activer la détection des systèmes d'exploitation et des services actifs ? (y/n)" valider_oui_non "n"
+demander_et_valider "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le chemin (ou appuyez sur Entrée pour ignorer) :" valider_chemin_fichier "y"
 
-# Si une adresse email est fournie, la valider
-if [ -n "$email" ]; then
-    email=$(valider_email "$email")
-fi
+# Demander si l'utilisateur veut envoyer le rapport par email
+demander_et_valider "emailTo" "Voulez-vous envoyer le rapport par email ? Si oui, entrez l'adresse email de destination (To) :" valider_email "y"
 
-# Préparer les options pour Nmap
-options=""
-if [ "$osScan" = "y" ]; then
-    options="$options -A"
+# Demander l'email d'expéditeur uniquement si l'utilisateur souhaite envoyer le rapport par email
+if [ -n "$emailTo" ]; then
+    demander_et_valider "emailFrom" "Entrez l'adresse email d'expéditeur (From) :" valider_email "n"
 fi
 
-# Construire la commande Nmap
-nmapCommand="nmap $options"
-case $scanType in
-    1)
-        nmapCommand="$nmapCommand -F $ip" ;;
-    2)
-        nmapCommand="$nmapCommand -p- -sT -sU $ip" ;;
-    3)
-        nmapCommand="$nmapCommand -p $ports $ip" ;;
-    *)
-        echo "Type de scan invalide. Choisissez 1, 2 ou 3."
-        exit 1 ;;
-esac
-
-# Exécuter la commande Nmap une seule fois et capturer la sortie
-scanOutput=$(eval "$nmapCommand")
-
-# Afficher ou sauvegarder la sortie en fonction du mode
-if [ "$cronMode" = "y" ]; then
-    # En mode cron, sauvegarder uniquement dans un fichier
-    if [ -n "$outputFile" ]; then
-        echo "$scanOutput" > "$outputFile"
-        echo "Rapport généré avec succès : $outputFile"
-    fi
+# Si le script est lancé en mode manuel (sans --cron), demander s'il faut lancer la commande immédiatement ou planifier une tâche cron
+if [ "$cronMode" != "y" ]; then
+    while true; do
+        echo "Voulez-vous lancer la commande immédiatement ou planifier une tâche cron ?"
+        echo "1 : Lancer immédiatement"
+        echo "2 : Planifier via cron"
+        read cronChoice
+        if valider_cron_choice "$cronChoice"; then
+            break
+        else
+            echo "Réponse invalide. Veuillez entrer 1 pour lancer immédiatement ou 2 pour planifier via cron."
+        fi
+    done
 else
-    # En mode interactif, afficher et sauvegarder si demandé
-    echo "$scanOutput"
+    cronChoice=2  # Si en mode cron, on planifie automatiquement
+fi
+
+if [ "$cronChoice" -eq 2 ]; then
+    # Demander l'heure et la fréquence
+    echo "À quelle heure voulez-vous exécuter la commande ? (Format : HH:MM)"
+    read cronTime
+
+    # Parser l'heure et la minute
+    cronTimeParsed=$(parse_cron_time "$cronTime")
+    cronMinute=$(echo "$cronTimeParsed" | cut -d ' ' -f 1)
+    cronHour=$(echo "$cronTimeParsed" | cut -d ' ' -f 2)
+
+    echo "Fréquence de la planification :"
+    echo "1 : Quotidien"
+    echo "2 : Hebdomadaire"
+    read cronFrequency
+
+    if [ "$cronFrequency" -eq 1 ]; then
+        # Planification quotidienne
+        cronJob="0 $cronMinute $cronHour * * * /path/to/your/script.sh --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
+    elif [ "$cronFrequency" -eq 2 ]; then
+        # Planification hebdomadaire
+        echo "Quel jour de la semaine voulez-vous pour la planification ? (Lundi, Mardi, etc.)"
+        read cronDay
+        cronDayNumber=$(obtenir_jour_semaine "$cronDay")
+        if [ "$cronDayNumber" == "Jour invalide" ]; then
+            echo "Jour invalide, annulation de la planification."
+            exit 1
+        fi
+        cronJob="0 $cronMinute $cronHour * * $cronDayNumber /path/to/your/script.sh --type $scanType --ip $ip --osScan $osScan --output $outputFile --emailFrom $emailFrom --emailTo $emailTo"
+    else
+        echo "Option de fréquence invalide."
+        exit 1
+    fi
+
+    # Ajouter la tâche cron
+    (crontab -l ; echo "$cronJob") | crontab -
+    echo "Tâche planifiée avec succès : $cronJob"
+else
+    # Lancer immédiatement
+    echo "Lancement du scan immédiatement..."
+    # Construct the Nmap command and execute it
+    nmapCommand="nmap $options"
+    case $scanType in
+        1)
+            nmapCommand="$nmapCommand -F $ip" ;;
+        2)
+            nmapCommand="$nmapCommand -p- -sT -sU $ip" ;;
+        3)
+            nmapCommand="$nmapCommand -p $ports $ip" ;;
+        *)
+            echo "Type de scan invalide. Choisissez 1, 2 ou 3."
+            exit 1 ;;
+    esac
+
+    # Exécuter la commande Nmap
+    scanOutput=$(eval "$nmapCommand")
+
+    # Sauvegarder le rapport si demandé
     if [ -n "$outputFile" ]; then
         echo "$scanOutput" > "$outputFile"
         echo "Rapport généré avec succès : $outputFile"
     fi
-fi
 
-# Envoyer le rapport par email si demandé
-if [ -n "$email" ]; then
-    if [ -n "$outputFile" ]; then
-        mail -s "Rapport de scan Nmap" "$email" < "$outputFile"
-    else
-        echo "$scanOutput" | mail -s "Rapport de scan Nmap" "$email"
+    # Envoyer le rapport par email
+    if [ -n "$emailTo" ]; then
+        if [ -n "$outputFile" ]; then
+            echo "Veuillez trouver ci-joint le rapport de scan Nmap." | mail -s "Rapport de scan Nmap" -r "$emailFrom" -A "$outputFile" "$emailTo"
+            echo "Rapport envoyé avec succès de $emailFrom à $emailTo"
+        else
+            echo "Erreur : Aucune pièce jointe à envoyer. Veuillez spécifier un fichier de rapport avec --output."
+            exit 1
+        fi
     fi
-    echo "Rapport envoyé avec succès à : $email"
 fi
 
