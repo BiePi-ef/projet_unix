@@ -9,6 +9,7 @@ ports=""
 osScan=""
 cronMode="n"
 outputFile=""
+noMail=""
 emailFrom=""
 emailTo=""
 cronJob=""
@@ -20,14 +21,15 @@ SCRIPTNAME=$(basename "$0")
 # Parse des arguments passés en ligne de commande
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --type) scanType="$2"; shift 2 ;;      # Type de scan : 1 = rapide, 2 = complet, 3 = personnalisé
-        --ip) ip="$2"; shift 2 ;;              # Adresse IP ou plage
-        --ports) ports="$2"; shift 2 ;;        # Ports à scanner (pour le type 3 uniquement)
-        --osScan) osScan="$2"; shift 2 ;;      # Détection avancée : y ou n
-        --output) outputFile="$2"; shift 2 ;;  # Fichier pour sauvegarder le rapport
+        --type) scanType="$2"; shift 2 ;;       # Type de scan : 1 = rapide, 2 = complet, 3 = personnalisé
+        --ip) ip="$2"; shift 2 ;;               # Adresse IP ou plage
+        --ports) ports="$2"; shift 2 ;;         # Ports à scanner (pour le type 3 uniquement)
+        --osScan) osScan="$2"; shift 2 ;;       # Détection avancée : y ou n
+        --output) outputFile="$2"; shift 2 ;;   # Fichier pour sauvegarder le rapport
+        --noMail) noMail="y"; shift ;;          # L'utilisateur ne veut pas envoyer de mail
         --emailFrom) emailFrom="$2"; shift 2 ;; # Adresse email d'expéditeur
-        --emailTo) emailTo="$2"; shift 2 ;;    # Adresse email de destination
-        --cron) cronMode="y"; shift ;;         # Activer le mode cron
+        --emailTo) emailTo="$2"; shift 2 ;;     # Adresse email de destination
+        --cron) cronMode="y"; shift ;;          # Activer le mode cron
         *) echo "Option inconnue : $1"; exit 1 ;;
     esac
 done
@@ -166,11 +168,13 @@ demander_et_valider "osScan" "Voulez-vous activer la détection des systèmes d'
 demander_et_valider "outputFile" "Voulez-vous sauvegarder le rapport dans un fichier ? Si oui, entrez le nom (ou appuyez sur Entrée pour ignorer) :" valider_nom_fichier "y"
 
 # Demander si l'utilisateur veut envoyer le rapport par email
-demander_et_valider "emailTo" "Voulez-vous envoyer le rapport par email ? Si oui, entrez l'adresse email de destination (To) :" valider_email "y"
+if [ "$noMail" != "y" ]; then
+    demander_et_valider "emailTo" "Voulez-vous envoyer le rapport par email ? Si oui, entrez l'adresse email de destination (To) :" valider_email "y"
 
-# Demander l'email d'expéditeur uniquement si l'utilisateur souhaite envoyer le rapport par email
-if [ -n "$emailTo" ]; then
-    demander_et_valider "emailFrom" "Entrez l'adresse email d'expéditeur (From) :" valider_email "n"
+    # Demander l'email d'expéditeur uniquement si l'utilisateur souhaite envoyer le rapport par email
+    if [ -n "$emailTo" ]; then
+        demander_et_valider "emailFrom" "Entrez l'adresse email d'expéditeur (From) :" valider_email "n"
+    fi
 fi
 
 # Si le script est lancé en mode manuel (sans --cron), demander s'il faut lancer la commande immédiatement ou planifier une tâche cron
