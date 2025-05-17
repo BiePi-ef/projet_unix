@@ -60,13 +60,18 @@ Indique que le rapport de scan doit être sauvegardé dans un fichier nommé rap
   - Le fichier sera créé dans le même répertoire que le script, sauf indication contraire.
   - Cela permet de conserver une trace des résultats pour une analyse ultérieure.
 
---emailFrom maxime@desclaux.fr
+--emailFrom exemple@exemple.fr
 Définit l'adresse email d'expéditeur utilisée pour envoyer le rapport.
 
---emailTo maxime@desclaux.fr
+--emailTo exemple@exemple.fr
 Spécifie l'adresse email de destination où le rapport sera envoyé après le scan.
 
 --cron
 
 Indique que la commande doit être planifiée dans une tâche cron pour une exécution ultérieure automatique.
 Le script demandera des informations supplémentaires (heure, fréquence) pour ajouter la tâche à cron.
+
+### Copiright 
+Ce petit script à été réalisé dans le cadre de mes cours avec Maxime-Desclaux et HoWilhem.
+Il ne sert qu'a titre d'exemple de mes capacité de scripting.
+Ne pas utiliser ou copier, merci.
