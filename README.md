@@ -71,7 +71,7 @@ Spécifie l'adresse email de destination où le rapport sera envoyé après le s
 Indique que la commande doit être planifiée dans une tâche cron pour une exécution ultérieure automatique.
 Le script demandera des informations supplémentaires (heure, fréquence) pour ajouter la tâche à cron.
 
-### Copiright 
-Ce petit script à été réalisé dans le cadre de mes cours avec Maxime-Desclaux et HoWilhem.
+### Copyright
+Ce petit script a été réalisé dans le cadre de mes cours avec Maxime-Desclaux et HoWilhem.
 Il ne sert qu'a titre d'exemple de mes capacité de scripting.
 Ne pas utiliser ou copier, merci.
